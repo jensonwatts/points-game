@@ -148,13 +148,14 @@ export default function Page() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "points_games", filter: `room_id=eq.${roomId}` },
-        (payload) => {
-          const nextState = payload.new?.payload as GameState | undefined;
-          if (nextState) {
-            setState(nextState);
-            setLastSaved(new Date().toLocaleString());
-          }
-        }
+       (payload) => {
+  const row = payload.new as { payload?: GameState } | null;
+  const nextState = row?.payload;
+  if (nextState) {
+    setState(nextState);
+    setLastSaved(new Date().toLocaleString());
+  }
+}
       )
       .subscribe();
 
