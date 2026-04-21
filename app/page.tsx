@@ -295,18 +295,23 @@ export default function Page() {
         </motion.div>
       </section>
 
-      <section className="tab-row">
-        {[
-          ["tracker", "Tracker", <Users key="u" size={16} />],
-          ["leaderboard", "Leaderboard", <Trophy key="t" size={16} />],
-          ["daily", "Daily", <CalendarDays key="c" size={16} />],
-          ["settings", "Settings", <BarChart3 key="b" size={16} />],
-        ].map(([key, label, icon]) => (
-          <button key={key} className={`tab ${tab === key ? "active" : ""}`} onClick={() => setTab(key as any)}>
-            {icon}{label}
-          </button>
-        ))}
-      </section>
+     <section className="tab-row">
+  {[
+    { id: "tracker", label: "Tracker", icon: <Users size={16} /> },
+    { id: "leaderboard", label: "Leaderboard", icon: <Trophy size={16} /> },
+    { id: "daily", label: "Daily", icon: <CalendarDays size={16} /> },
+    { id: "settings", label: "Settings", icon: <BarChart3 size={16} /> },
+  ].map((item) => (
+    <button
+      key={item.id}
+      className={`tab ${tab === item.id ? "active" : ""}`}
+      onClick={() => setTab(item.id as "tracker" | "leaderboard" | "daily" | "settings")}
+    >
+      {item.icon}
+      {item.label}
+    </button>
+  ))}
+</section>
 
       {tab === "tracker" && (
         <section className="card section-card">
