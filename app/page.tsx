@@ -97,6 +97,8 @@ export default function Page() {
   const [state, setState] = useState<GameState>(makeInitialState());
   const [tab, setTab] = useState<"tracker" | "leaderboard" | "daily" | "settings">("tracker");
   const [newPlayer, setNewPlayer] = useState("");
+  const [newKpi, setNewKpi] = useState("");
+  const [newKpiPoints, setNewKpiPoints] = useState(1);
   const [editingTitle, setEditingTitle] = useState(false);
   const [isSynced, setIsSynced] = useState(false);
   const [lastSaved, setLastSaved] = useState("");
@@ -148,14 +150,14 @@ export default function Page() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "points_games", filter: `room_id=eq.${roomId}` },
-       (payload) => {
-  const row = payload.new as { payload?: GameState } | null;
-  const nextState = row?.payload;
-  if (nextState) {
-    setState(nextState);
-    setLastSaved(new Date().toLocaleString());
-  }
-}
+        (payload) => {
+          const row = payload.new as { payload?: GameState } | null;
+          const nextState = row?.payload;
+          if (nextState) {
+            setState(nextState);
+            setLastSaved(new Date().toLocaleString());
+          }
+        }
       )
       .subscribe();
 
@@ -227,6 +229,37 @@ export default function Page() {
     setNewPlayer("");
   }
 
+  function removePlayer(player: string) {
+    setState((prev) => {
+      const newPlayers = prev.players.filter((p) => p !== player);
+      const newCounts = { ...prev.weeklyCounts };
+      delete newCounts[player];
+      const newDaily = prev.daily.map((d) => {
+        const copy = { ...d.players };
+        delete copy[player];
+        return { ...d, players: copy };
+      });
+      return { ...prev, players: newPlayers, weeklyCounts: newCounts, daily: newDaily, updatedAt: new Date().toISOString() };
+    });
+  }
+
+  function addKpi() {
+    const name = newKpi.trim();
+    if (!name) return;
+    const key = name.toLowerCase().replace(/\s/g, "");
+    if (state.activities.find((a) => a.key === key)) return;
+    setState((prev) => ({
+      ...prev,
+      updatedAt: new Date().toISOString(),
+      activities: [...prev.activities, { key, label: name, points: newKpiPoints }],
+      weeklyCounts: Object.fromEntries(
+        prev.players.map((p) => [p, { ...prev.weeklyCounts[p], [key]: 0 }])
+      ),
+    }));
+    setNewKpi("");
+    setNewKpiPoints(1);
+  }
+
   function updateActivityPoints(key: string, points: string) {
     const numeric = Math.max(0, Number(points) || 0);
     setState((prev) => ({
@@ -242,6 +275,11 @@ export default function Page() {
 
   return (
     <main className="shell">
+      <div style={{ background: "linear-gradient(90deg, #0b1f3a, #03152F)", padding: "20px", borderRadius: "16px", marginBottom: "20px" }}>
+        <h1 style={{ margin: 0, color: "white", fontSize: "1.5rem", fontWeight: 800, letterSpacing: "0.05em" }}>BOURNE SEARCH</h1>
+        <p style={{ margin: 0, color: "#9fb0cf", fontSize: "0.875rem" }}>Connecting Talent. Powering FinTech.</p>
+      </div>
+
       <section className="top-note">
         {!isSynced ? (
           <div className="note warning"><WifiOff size={16} /><span>Local mode only. Add your Supabase env keys in Vercel to make it shared.</span></div>
@@ -295,23 +333,23 @@ export default function Page() {
         </motion.div>
       </section>
 
-     <section className="tab-row">
-  {[
-    { id: "tracker", label: "Tracker", icon: <Users size={16} /> },
-    { id: "leaderboard", label: "Leaderboard", icon: <Trophy size={16} /> },
-    { id: "daily", label: "Daily", icon: <CalendarDays size={16} /> },
-    { id: "settings", label: "Settings", icon: <BarChart3 size={16} /> },
-  ].map((item) => (
-    <button
-      key={item.id}
-      className={`tab ${tab === item.id ? "active" : ""}`}
-      onClick={() => setTab(item.id as "tracker" | "leaderboard" | "daily" | "settings")}
-    >
-      {item.icon}
-      {item.label}
-    </button>
-  ))}
-</section>
+      <section className="tab-row">
+        {[
+          { id: "tracker", label: "Tracker", icon: <Users size={16} /> },
+          { id: "leaderboard", label: "Leaderboard", icon: <Trophy size={16} /> },
+          { id: "daily", label: "Daily", icon: <CalendarDays size={16} /> },
+          { id: "settings", label: "Settings", icon: <BarChart3 size={16} /> },
+        ].map((item) => (
+          <button
+            key={item.id}
+            className={`tab ${tab === item.id ? "active" : ""}`}
+            onClick={() => setTab(item.id as "tracker" | "leaderboard" | "daily" | "settings")}
+          >
+            {item.icon}
+            {item.label}
+          </button>
+        ))}
+      </section>
 
       {tab === "tracker" && (
         <section className="card section-card">
@@ -409,6 +447,26 @@ export default function Page() {
                 </div>
               ))}
             </div>
+            <div style={{ marginTop: "20px", display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
+              <input
+                placeholder="New KPI name"
+                value={newKpi}
+                onChange={(e) => setNewKpi(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && addKpi()}
+                style={{ flex: 1, minWidth: "120px" }}
+                className="settings-input"
+              />
+              <input
+                type="number"
+                min="0"
+                placeholder="Pts"
+                value={newKpiPoints}
+                onChange={(e) => setNewKpiPoints(Number(e.target.value))}
+                style={{ width: "70px" }}
+                className="settings-input"
+              />
+              <button className="button" onClick={addKpi}>Add KPI</button>
+            </div>
           </div>
 
           <div className="card section-card">
@@ -418,7 +476,18 @@ export default function Page() {
               <button className="button" onClick={addPlayer}>Add</button>
             </div>
             <div className="badge-wrap">
-              {state.players.map((player) => <span className="badge" key={player}>{player}</span>)}
+              {state.players.map((player) => (
+                <span key={player} className="badge" style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                  {player}
+                  <button
+                    onClick={() => removePlayer(player)}
+                    style={{ background: "transparent", border: "none", color: "inherit", cursor: "pointer", padding: "0", lineHeight: 1, opacity: 0.7 }}
+                    title={`Remove ${player}`}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
             </div>
           </div>
         </section>
